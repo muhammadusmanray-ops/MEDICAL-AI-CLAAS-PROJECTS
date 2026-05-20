@@ -4,7 +4,7 @@ import { StatsBar } from './components/StatsBar';
 import { WorkbenchPanel } from './components/WorkbenchPanel';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { HistorySection } from './components/HistorySection';
-import { ShieldCheck, HeartPulse, HardDrive, GraduationCap } from 'lucide-react';
+import { ShieldCheck, HeartPulse, HardDrive, GraduationCap, Brain } from 'lucide-react';
 
 export default function App() {
   // Stats tracking state
