@@ -149,6 +149,89 @@ def analyze():
         print(e)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/preset', methods=['POST'])
+def preset():
+    data = request.json
+    preset_type = data.get('type', 'normal')
+    
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        condition = "Pneumonia with severe alveolar consolidation" if preset_type == 'pneumonia' else "Normal, clear healthy lungs"
+        prompt = f"""
+        You are an expert radiologist AI. Generate a highly realistic medical report JSON for a patient who has been scanned.
+        The condition is known to be: {condition}.
+        
+        You MUST return the output EXACTLY as a valid JSON object with the following keys and format:
+        {{
+            "diagnosis": "{'PNEUMONIA DETECTED' if preset_type == 'pneumonia' else 'NORMAL'}",
+            "confidence": {"a random float between 88.0 and 99.0" if preset_type == 'pneumonia' else "a random float between 95.0 and 99.9"},
+            "severity": "{'Severe' if preset_type == 'pneumonia' else 'N/A'}",
+            "region": "{'Bilateral Lower Lobes' if preset_type == 'pneumonia' else 'Bilateral Clear'}",
+            "recommendation": "A detailed, professional 2-3 sentence clinical recommendation based on the condition."
+        }}
+        Do not add any markdown formatting. Return ONLY the raw JSON string.
+        """
+        
+        response = model.generate_content(prompt)
+        
+        # Parse the JSON response
+        try:
+            raw_text = response.text.strip()
+            if raw_text.startswith('```json'): raw_text = raw_text[7:]
+            if raw_text.startswith('```'): raw_text = raw_text[3:]
+            if raw_text.endswith('```'): raw_text = raw_text[:-3]
+            ai_data = json.loads(raw_text.strip())
+        except Exception as json_e:
+            ai_data = {
+                "diagnosis": "PNEUMONIA DETECTED" if preset_type == 'pneumonia' else "NORMAL",
+                "confidence": 92.5,
+                "severity": "Moderate" if preset_type == 'pneumonia' else "N/A",
+                "region": "Detected Region",
+                "recommendation": response.text
+            }
+            
+        # Generate Real Patient ID and Save to DB
+        now = datetime.now()
+        timestamp_str = now.strftime('%Y-%m-%d %H:%M')
+        image_name = f"SIM_{preset_type.upper()}_CHEST.DCM"
+        unique_string = image_name + timestamp_str
+        hash_id = hashlib.sha1(unique_string.encode()).hexdigest()[:8].upper()
+        patient_id = f"PAC-X-{hash_id}"
+        scan_id = f"case-{int(now.timestamp())}"
+        
+        conn = sqlite3.connect('mediscan.db')
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO scans 
+            (id, patient_id, image_name, diagnosis, confidence, severity, region, recommendation, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            scan_id, patient_id, image_name, 
+            ai_data.get('diagnosis', 'Unknown'), 
+            ai_data.get('confidence', 0.0), 
+            ai_data.get('severity', 'N/A'), 
+            ai_data.get('region', 'N/A'), 
+            ai_data.get('recommendation', ''), 
+            timestamp_str
+        ))
+        conn.commit()
+        conn.close()
+        
+        result_payload = {
+            "id": scan_id,
+            "patientId": patient_id,
+            "imageName": image_name,
+            "timestamp": timestamp_str,
+            **ai_data
+        }
+            
+        return jsonify({'success': True, 'result': result_payload})
+        
+    except Exception as e:
+        print(e)
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/history', methods=['GET'])
 def get_history():
     try:

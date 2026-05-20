@@ -77,12 +77,20 @@ export default function App() {
         } else {
             aiResultText = 'Error analyzing image: ' + (data.error || 'Unknown error');
         }
-      } else {
-        // Fallback for preset images that are procedural
-        await new Promise((res) => setTimeout(res, 2000));
-        aiResultText = forcedOutcome === 'pneumonia' 
-          ? 'AI Analysis suggests signs of pneumonia consolidation.' 
-          : 'AI Analysis suggests normal clear lungs.';
+      } else if (forcedOutcome) {
+        // Fetch preset analysis from real backend
+        const response = await fetch('http://127.0.0.1:5000/api/preset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: forcedOutcome })
+        });
+        const data = await response.json();
+        if (data.success) {
+            aiResult = data.result;
+            aiResultText = aiResult.recommendation;
+        } else {
+            aiResultText = 'Error generating preset analysis.';
+        }
       }
 
       if (aiResult && typeof aiResult === 'object' && aiResult.id) {
@@ -371,39 +379,51 @@ function DiagnosticMatrix({ activeScan }: { activeScan: HistoryItem | null }) {
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-700 shadow-2xl shadow-sky-900/10 rounded-xl w-full h-[500px] flex overflow-hidden mt-8">
+    <div className="bg-slate-900 border border-slate-700 shadow-2xl shadow-sky-900/10 rounded-xl w-full h-[550px] flex overflow-hidden mt-8">
       {/* Left side: Results Context */}
-      <div className="w-1/3 bg-slate-850 p-6 border-r border-slate-700 flex flex-col">
-        <h3 className="text-lg font-bold text-sky-400 flex items-center gap-2 mb-4">
-          <span>🧠</span> Diagnostic Matrix
+      <div className="w-1/3 bg-slate-850 p-6 border-r border-slate-700 flex flex-col relative overflow-hidden">
+        {/* Subtle grid background */}
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
+        
+        <h3 className="text-lg font-bold text-sky-400 flex items-center gap-2 mb-4 relative z-10">
+          <Brain className="h-5 w-5" /> 
+          Diagnostic Matrix
         </h3>
         
         {activeScan ? (
-          <div className="space-y-4 text-sm text-slate-300">
-             <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-               <span className="block text-xs text-slate-500 font-mono mb-1">IMAGE</span>
-               <div className="font-medium truncate">{activeScan.imageName}</div>
+          <div className="space-y-4 text-sm text-slate-300 relative z-10 flex-1 overflow-y-auto pr-2">
+             <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-700/50 backdrop-blur-sm hover:border-sky-500/30 transition-colors">
+               <span className="block text-[10px] text-sky-500/80 font-mono mb-1 tracking-widest uppercase">Target Image Ref</span>
+               <div className="font-medium truncate text-white">{activeScan.imageName}</div>
              </div>
              
-             <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-               <span className="block text-xs text-slate-500 font-mono mb-1">REAL DIAGNOSIS</span>
-               <div className={`font-bold ${activeScan.diagnosis.includes('NORMAL') ? 'text-emerald-400' : 'text-rose-400'}`}>
+             <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-700/50 backdrop-blur-sm">
+               <span className="block text-[10px] text-sky-500/80 font-mono mb-1 tracking-widest uppercase">Core Diagnosis</span>
+               <div className={`text-lg font-bold tracking-wide ${activeScan.diagnosis.includes('NORMAL') ? 'text-emerald-400' : 'text-rose-400'}`}>
                  {activeScan.diagnosis}
                </div>
              </div>
 
-             <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-               <span className="block text-xs text-slate-500 font-mono mb-1">REAL CONFIDENCE</span>
-               <div className="font-bold text-sky-400 text-xl">{activeScan.confidence}%</div>
+             <div className="grid grid-cols-2 gap-3">
+               <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-700/50 backdrop-blur-sm text-center">
+                 <span className="block text-[10px] text-sky-500/80 font-mono mb-1 tracking-widest uppercase">Confidence</span>
+                 <div className="font-bold text-sky-400 text-xl">{activeScan.confidence}%</div>
+               </div>
+               <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-700/50 backdrop-blur-sm text-center">
+                 <span className="block text-[10px] text-sky-500/80 font-mono mb-1 tracking-widest uppercase">Severity</span>
+                 <div className={`font-bold text-sm mt-1 ${activeScan.severity === 'Severe' ? 'text-rose-400' : activeScan.severity === 'Moderate' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                   {activeScan.severity}
+                 </div>
+               </div>
              </div>
 
-             <div className="p-3 bg-slate-800 rounded-lg border border-slate-700 flex-1 overflow-y-auto">
-               <span className="block text-xs text-slate-500 font-mono mb-1">AI INSIGHTS</span>
-               <div>{activeScan.recommendation}</div>
+             <div className="p-4 bg-slate-900/80 rounded-lg border border-slate-700/50 backdrop-blur-sm mt-2">
+               <span className="block text-[10px] text-sky-500/80 font-mono mb-2 tracking-widest uppercase">AI Clinical Insights</span>
+               <div className="text-xs leading-relaxed text-slate-300 italic">"{activeScan.recommendation}"</div>
              </div>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-500 text-sm text-center">
+          <div className="flex-1 flex items-center justify-center text-slate-500 text-sm text-center relative z-10">
             Upload an image to populate the diagnostic matrix.
           </div>
         )}
@@ -413,18 +433,38 @@ function DiagnosticMatrix({ activeScan }: { activeScan: HistoryItem | null }) {
       <div className="w-2/3 flex flex-col bg-slate-900">
         <div className="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col">
           {messages.length === 0 && (
-            <div className="flex-1 flex items-center justify-center flex-col text-slate-500 gap-2">
-              <span className="text-4xl opacity-20">💬</span>
-              <p>Ask a query about the medical scan</p>
+            <div className="flex-1 flex items-center justify-center flex-col text-slate-500 gap-4">
+              <div className="p-4 bg-slate-800 rounded-full border border-slate-700">
+                <Brain className="h-8 w-8 text-sky-500/50" />
+              </div>
+              <p className="font-medium text-slate-400">Initialize context query sequence.</p>
             </div>
           )}
           {messages.map((m, i) => (
-            <div key={i} className={`p-4 rounded-xl text-sm max-w-[85%] leading-relaxed ${m.isUser ? 'bg-sky-600/90 text-white self-end shadow-lg shadow-sky-900/20' : 'bg-slate-800 text-slate-300 self-start border border-slate-700'}`}>
+            <div key={i} className={`p-4 rounded-xl text-sm max-w-[85%] leading-relaxed ${m.isUser ? 'bg-sky-600/90 text-white self-end shadow-lg shadow-sky-900/20 rounded-tr-sm' : 'bg-slate-800 text-slate-300 self-start border border-slate-700 rounded-tl-sm'}`}>
               {m.text}
             </div>
           ))}
-          {isLoading && <div className="text-sm text-sky-400 animate-pulse self-start p-4 bg-slate-800 rounded-xl border border-slate-700">Analyzing query...</div>}
+          {isLoading && (
+            <div className="self-start p-4 bg-slate-800 rounded-xl border border-slate-700 rounded-tl-sm flex gap-2 items-center">
+              <span className="h-2 w-2 bg-sky-400 rounded-full animate-bounce"></span>
+              <span className="h-2 w-2 bg-sky-400 rounded-full animate-bounce delay-75"></span>
+              <span className="h-2 w-2 bg-sky-400 rounded-full animate-bounce delay-150"></span>
+            </div>
+          )}
         </div>
+        
+        {/* Quick Queries (Distinct AI Feature) */}
+        {activeScan && !isLoading && messages.length < 3 && (
+          <div className="px-6 py-2 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {['What are the immediate next steps?', 'Explain the severity in simple terms.', 'Are there any secondary anomalies?'].map((q, idx) => (
+              <button key={idx} onClick={() => { setInput(q); }} className="whitespace-nowrap text-xs bg-slate-800 border border-slate-700 hover:border-sky-500/50 hover:bg-slate-750 text-slate-300 px-3 py-1.5 rounded-full transition-colors">
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="p-4 bg-slate-850 border-t border-slate-800 flex gap-3">
           <input 
             type="text" 
