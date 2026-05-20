@@ -1,0 +1,7 @@
+flask
+flask-cors
+werkzeug
+google-generativeai
+opencv-python
+pillow
+python-dotenv

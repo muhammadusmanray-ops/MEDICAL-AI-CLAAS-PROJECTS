@@ -1,0 +1,6 @@
+{
+  "name": "MediScan AI",
+  "description": "Intelligent Medical Image Analysis System Powered by Deep Learning",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
