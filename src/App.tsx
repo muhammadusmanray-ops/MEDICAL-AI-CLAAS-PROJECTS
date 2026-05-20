@@ -6,6 +6,8 @@ import { AnalysisPanel } from './components/AnalysisPanel';
 import { HistorySection } from './components/HistorySection';
 import { ShieldCheck, HeartPulse, HardDrive, GraduationCap, Brain } from 'lucide-react';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+
 export default function App() {
   // Stats tracking state
   const [stats, setStats] = useState<ScanStats>({
@@ -23,7 +25,7 @@ export default function App() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:5000/api/history')
+    fetch(`${API_BASE}/api/history`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -61,7 +63,7 @@ export default function App() {
         formData.append('image', fileObj);
         formData.append('type', 'medical');
 
-        const response = await fetch('http://127.0.0.1:5000/api/analyze', {
+        const response = await fetch(`${API_BASE}/api/analyze`, {
             method: 'POST',
             body: formData,
         });
@@ -79,7 +81,7 @@ export default function App() {
         }
       } else if (forcedOutcome) {
         // Fetch preset analysis from real backend
-        const response = await fetch('http://127.0.0.1:5000/api/preset', {
+        const response = await fetch(`${API_BASE}/api/preset`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: forcedOutcome })
@@ -183,39 +185,11 @@ export default function App() {
     setActiveScan(null);
   };
 
-  // Procedural DICOM report download simulation
+  // Real DICOM PDF report download from backend
   const downloadReportDicom = () => {
     if (!activeScan) return;
-    const reportText = `
-=========================================
-      MEDISCAN AI LABORATORY REPORT     
-=========================================
-TIMESTAMP:      ${activeScan.timestamp}
-PATIENT ID:     ${activeScan.patientId}
-FILE REFERENCE: ${activeScan.imageName}
------------------------------------------
-DIAGNOSTIC ANALYSIS PREDICTION
------------------------------------------
-RESULT:         ${activeScan.diagnosis}
-CONFIDENCE:     ${activeScan.confidence}%
-SEVERITY INDEX: ${activeScan.severity}
-AFFECTED REGION:${activeScan.region}
------------------------------------------
-RECOMMENDED CLINICAL PATHWAY:
-"${activeScan.recommendation}"
------------------------------------------
-SYSTEM ACCURACY VERIFICATION: 94.3% LARS MODEL
-PREPARED VIA UNIVERSITY COGNITIVE MEDICINE LABS
-=========================================
-`;
-    // Standard file generation and trigger download
-    const element = document.createElement('a');
-    const file = new Blob([reportText], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = `DICOM_LAB_REPORT_${activeScan.patientId}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    // Hit the backend API to generate and download the actual PDF
+    window.location.href = `${API_BASE}/api/report/${activeScan.id}`;
   };
 
   return (
@@ -361,7 +335,7 @@ function DiagnosticMatrix({ activeScan }: { activeScan: HistoryItem | null }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/chat', {
+      const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMsg, context: activeScanContext })
